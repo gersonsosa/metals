@@ -423,6 +423,53 @@ class SbtBloopLspSuite
     } yield ()
   }
 
+  test("jvm processorpath option") {
+    cleanWorkspace()
+    for {
+      _ <- initialize(
+        s"""
+           |/project/build.properties
+           |sbt.version=$sbtVersion
+           |/build.sbt
+           |scalaVersion := "${V.scala213}"
+           |javacOptions ++= Seq("-processorpath", "./src/main/java/example/Analyzer.java")
+           |/src/main/java/example/Analyzer.java
+           |package example;
+           |import com.sun.source.util.*;
+           |public class Analyzer implements Plugin {
+           |    private static class InternalTaskListener implements TaskListener {
+           |        private final JavacTask task;
+           |        public InternalTaskListener(JavacTask task) {}
+           |        @Override
+           |        public void started(TaskEvent event) {}
+           |       @Override
+           |       public void finished(TaskEvent event) {}
+           |    }
+           |    @Override
+           |    public String getName() {
+           |        return "Analyzer";
+           |    }
+           |    @Override
+           |    public void init(JavacTask task, String... args) {
+           |        task.addTaskListener(new InternalTaskListener(task));
+           |    }
+           |}
+           |/src/main/java/example/MyClass.java
+           |package example;
+           |public class MyClass {
+           |    int field;
+           |}
+           |/src/main/scala/Main.scala
+           |object Main extends App {
+           |    println("Hello world!")
+           |}
+           |""".stripMargin
+      )
+      // assert that a `javacOptions` doesn't break "Import build"
+      _ = assertStatus(_.isInstalled)
+    } yield ()
+  }
+
   test("fatal-warnings") {
     cleanWorkspace()
     for {
